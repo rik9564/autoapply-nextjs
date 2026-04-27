@@ -92,19 +92,27 @@ async function main() {
       process.exit(1);
     }
 
-    console.log(`[3/3] Starting Next.js development server...`);
-    const npmCmd = /^win/.test(process.platform) ? 'npm.cmd' : 'npm';
-    
-    const devProcess = spawn(npmCmd, ['run', 'next:dev'], { 
+    // Close readline BEFORE spawning — on Windows, keeping readline open
+    // while calling spawn() causes EINVAL (stdin conflict).
+    rl.close();
+
+    console.log(`[3/3] Starting Next.js development server on http://localhost:4000 ...\n`);
+
+    const isWindows = /^win/.test(process.platform);
+    const devProcess = spawn('npm', ['run', 'next:dev'], { 
       stdio: 'inherit',
+      shell: true, // required on Windows to resolve npm correctly
       env: { ...process.env, NEXT_PUBLIC_DEFAULT_MODEL: selectedModel, OLLAMA_URL: OLLAMA_URL } 
     });
 
-    devProcess.on('close', (code) => {
-      process.exit(code);
+    devProcess.on('error', (err) => {
+      console.error('Failed to start Next.js server:', err.message);
+      process.exit(1);
     });
 
-    rl.close();
+    devProcess.on('close', (code) => {
+      process.exit(code ?? 0);
+    });
   });
 }
 
