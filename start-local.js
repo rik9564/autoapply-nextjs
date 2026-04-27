@@ -6,7 +6,13 @@ const rl = readline.createInterface({
   output: process.stdout
 });
 
-const models = ['gemma:4b', 'gemma', 'gemma:7b', 'gemma2'];
+const models = [
+  { tag: 'gemma4:31b',    label: 'Gemma 4 31B   — 20GB  | 256K context | Text + Image  (Best quality)' },
+  { tag: 'gemma4:26b',    label: 'Gemma 4 26B   — 18GB  | 256K context | Text + Image' },
+  { tag: 'gemma4:latest', label: 'Gemma 4 Latest — 9.6GB | 128K context | Text + Image' },
+  { tag: 'gemma4:e4b',    label: 'Gemma 4 E4B   —  9.6GB | 128K context | Text + Image' },
+  { tag: 'gemma4:e2b',    label: 'Gemma 4 E2B   —  7.2GB | 128K context | Lightest' },
+];
 
 // Default to 127.0.0.1 instead of localhost to avoid IPv6 resolution issues on some machines
 const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
@@ -53,12 +59,13 @@ async function main() {
     process.exit(1);
   }
 
-  console.log("Available Local Models:");
-  models.forEach((m, i) => console.log(`  ${i + 1}. ${m}`));
+  console.log("Available Gemma 4 Models:");
+  models.forEach((m, i) => console.log(`  ${i + 1}. ${m.label}`));
 
-  rl.question('\nSelect a model by number (default 1): ', (answer) => {
+  rl.question('\nSelect a model by number (default 1 — gemma4:31b): ', (answer) => {
     const index = parseInt(answer) - 1;
-    const selectedModel = models[index] || models[0];
+    const selected = models[Math.max(0, Math.min(index, models.length - 1))] || models[0];
+    const selectedModel = selected.tag;
     console.log(`\n=> Selected model: ${selectedModel}\n`);
     
     console.log(`[1/3] Pulling ${selectedModel} via Ollama... (This might take a while if not downloaded)`);
@@ -69,7 +76,7 @@ async function main() {
         stdio: 'inherit',
         env: { ...process.env, OLLAMA_HOST: ollamaHost }
       });
-      console.log("✅ Model pulled successfully.\n");
+      console.log("✅ Model ready.\n");
     } catch (err) {
       console.error("⚠️  Could not pull the model using local 'ollama' CLI. If Ollama is remote, make sure the model is pulled there.");
     }

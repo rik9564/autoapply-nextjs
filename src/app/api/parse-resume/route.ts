@@ -94,43 +94,51 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const systemPrompt = `You are an expert resume parser. Extract structured information from the resume.
+    const systemPrompt = `You are a world-class resume parser with deep expertise in software engineering, data science, and technology roles.
 
-IMPORTANT: Calculate total years of experience by adding up ALL work experience durations.
-- Jan 2022 to Present (January 2026) = 4 years
-- July 2024 to Present = 1.5 years
-- Add overlapping periods only once
+Your goal is to extract a complete and accurate structured profile from the resume text provided.
 
-Return ONLY valid JSON with this structure:
+EXPERIENCE CALCULATION RULES:
+- Calculate totalYearsExperience by summing ALL unique work periods (do not double-count overlapping roles)
+- "Present" means today: April 2026
+- Example: Jan 2022 – Present = 4.3 years; Jul 2024 – Present = 1.75 years
+- Round to one decimal place
+
+SKILLS EXTRACTION:
+- Be exhaustive — extract ALL technical skills: languages, frameworks, libraries, cloud platforms, databases, tools, CI/CD, methodologies, soft skills
+- Include skills implied by job descriptions even if not listed explicitly in a skills section
+- Aim for 30+ skills if the resume supports it
+
+Return ONLY valid JSON with this exact structure (no markdown, no explanation):
 {
   "name": "Full name",
   "email": "email@example.com",
-  "phone": "phone number or empty",
-  "summary": "2-3 sentence professional summary",
-  "skills": ["Skill1", "Skill2", ...up to 20 key skills],
+  "phone": "phone number or empty string",
+  "summary": "3-4 sentence professional summary highlighting seniority, core strengths and key achievements",
+  "skills": ["Skill1", "Skill2", "..."],
   "experience": [
     {
       "title": "Job Title",
       "company": "Company Name",
-      "duration": "2 years" or "2020-2023",
-      "highlights": ["Key achievement 1", "Key achievement 2"]
+      "duration": "Jan 2022 – Present (4.3 years)",
+      "highlights": ["Quantified achievement 1", "Achievement 2", "Achievement 3"]
     }
   ],
   "education": [
     {
-      "degree": "Degree name",
-      "institution": "University/College",
+      "degree": "Degree name and field",
+      "institution": "University/College name",
       "year": "2020"
     }
   ],
-  "totalYearsExperience": 4,
-  "topSkillCategories": ["Programming", "Testing", "Cloud"] // 3-5 main areas
+  "totalYearsExperience": 4.3,
+  "topSkillCategories": ["Backend Engineering", "Cloud Infrastructure", "Testing"] 
 }
 
-Be thorough in extracting skills - include programming languages, frameworks, tools, methodologies, soft skills.
-No markdown, just JSON.`;
+topSkillCategories should be 3-5 broad areas that best describe the candidate's expertise.`;
 
-    const userPrompt = `Parse this resume:\n\n${resumeText.substring(0, 15000)}`;
+    // Pass up to 60K chars — well within gemma4:31b's 256K context window
+    const userPrompt = `Parse this resume and return the structured JSON profile:\n\n${resumeText.substring(0, 60000)}`;
 
     try {
       // Use AI service with caching
@@ -138,8 +146,8 @@ No markdown, just JSON.`;
         type: 'parse-resume',
         systemPrompt,
         userPrompt,
-        temperature: 0.2,
-        maxTokens: 4000,
+        temperature: 0.1, // Low temp for deterministic structured extraction
+        maxTokens: 8000,  // Plenty of room for a full rich profile
       });
 
       console.log(`\nAI Response (first 500 chars): ${response.content.substring(0, 500)}`);

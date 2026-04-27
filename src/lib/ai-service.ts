@@ -2,84 +2,63 @@ import { supabase } from './supabase';
 import { getSettingNumber, getSetting, updateSetting } from './settings';
 import crypto from 'crypto';
 
-// Ollama Claude Proxy endpoint (Anthropic Messages API format)
-const OLLAMA_URL = process.env.OLLAMA_URL || 'http://localhost:11434';
+// Ollama endpoint - override via OLLAMA_URL env var for remote VMs
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 
-// Available models via Ollama proxy
+// Available Gemma 4 models via Ollama
+// Context windows: 31b/26b = 256K tokens, others = 128K tokens
 export const AVAILABLE_MODELS = {
-  'gemma:4b': {
-    name: 'Gemma 4B',
+  'gemma4:31b': {
+    name: 'Gemma 4 31B',
     type: 'both' as const,
     thinking: false,
-    description: 'Local Gemma 4B model via Ollama',
+    contextWindow: 262144, // 256K tokens
+    description: 'Most capable local Gemma 4, 256K context, Text + Image',
   },
-  'gemma': {
-    name: 'Gemma',
+  'gemma4:26b': {
+    name: 'Gemma 4 26B',
     type: 'both' as const,
     thinking: false,
-    description: 'Local Gemma model via Ollama',
+    contextWindow: 262144, // 256K tokens
+    description: 'High capability Gemma 4, 256K context, Text + Image',
   },
-  'gemma2': {
-    name: 'Gemma 2',
+  'gemma4:latest': {
+    name: 'Gemma 4 Latest (9.6GB)',
     type: 'both' as const,
     thinking: false,
-    description: 'Local Gemma 2 model via Ollama',
+    contextWindow: 131072, // 128K tokens
+    description: 'Gemma 4 default tag, 128K context, Text + Image',
   },
-  'gemma:7b': {
-    name: 'Gemma 7B',
+  'gemma4:e4b': {
+    name: 'Gemma 4 E4B (9.6GB)',
     type: 'both' as const,
     thinking: false,
-    description: 'Local Gemma 7B model via Ollama',
+    contextWindow: 131072, // 128K tokens
+    description: 'Gemma 4 Efficient 4B, 128K context, Text + Image',
   },
-  'gemini-3-pro-high': {
-    name: 'Gemini 3 Pro (High)',
-    type: 'chat' as const,
-    thinking: true,
-    description: 'Extended thinking mode for deep analysis',
-  },
-  'gemini-3-pro-low': {
-    name: 'Gemini 3 Pro (Low)',
+  'gemma4:e2b': {
+    name: 'Gemma 4 E2B (7.2GB)',
     type: 'both' as const,
     thinking: false,
-    description: 'Fast Gemini 3 Pro responses',
-  },
-  'gemini-3-flash': {
-    name: 'Gemini 3 Flash',
-    type: 'structured' as const,
-    thinking: false,
-    description: 'Fastest Gemini model, great for structured output',
-  },
-  'claude-sonnet-4-5-20250514': {
-    name: 'Claude Sonnet 4.5',
-    type: 'both' as const,
-    thinking: false,
-    description: 'Fast and capable for most tasks',
-  },
-  'claude-sonnet-4-5-20250514-thinking': {
-    name: 'Claude Sonnet 4.5 (Thinking)',
-    type: 'chat' as const,
-    thinking: true,
-    description: 'Extended thinking for complex reasoning',
-  },
-  'claude-opus-4-5-20250514-thinking': {
-    name: 'Claude Opus 4.5 (Thinking)',
-    type: 'chat' as const,
-    thinking: true,
-    description: 'Most capable Claude with extended thinking',
-  },
-  'gpt-oss': {
-    name: 'GPT-OSS',
-    type: 'both' as const,
-    thinking: false,
-    description: 'OpenAI GPT open-source compatible model',
+    contextWindow: 131072, // 128K tokens
+    description: 'Gemma 4 Efficient 2B, lightest Gemma 4, 128K context',
   },
 } as const;
 
 export type ModelId = keyof typeof AVAILABLE_MODELS;
 
-// Default models
-const DEFAULT_CHAT_MODEL: ModelId = 'gemma:4b';
-const DEFAULT_STRUCTURED_MODEL: ModelId = 'gemma:4b';
+// Per-model context window sizes (tokens) used to set num_ctx in Ollama
+const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  'gemma4:31b':    262144,
+  'gemma4:26b':    262144,
+  'gemma4:latest': 131072,
+  'gemma4:e4b':    131072,
+  'gemma4:e2b':    131072,
+};
+
+// Default models — using gemma4:31b since that's the installed model
+const DEFAULT_CHAT_MODEL: ModelId = 'gemma4:31b';
+const DEFAULT_STRUCTURED_MODEL: ModelId = 'gemma4:31b';
 
 // In-memory model cache (refreshed from DB)
 let currentChatModel: ModelId = DEFAULT_CHAT_MODEL;
@@ -303,7 +282,8 @@ async function cacheResponse(
 }
 
 /**
- * Make AI request to Ollama Claude Proxy (Anthropic Messages API format)
+ * Make AI request to Ollama using the chat API
+ * Automatically sets num_ctx based on the model's known context window
  */
 async function makeAIRequest(
   model: string,
@@ -316,6 +296,9 @@ async function makeAIRequest(
   if (!checkRateLimit()) {
     await waitForRateLimit();
   }
+
+  // Look up this model's context window (fall back to 128K for unknown models)
+  const numCtx = MODEL_CONTEXT_WINDOWS[model] ?? 131072;
 
   try {
     const response = await fetch(`${OLLAMA_URL}/api/chat`, {
@@ -332,7 +315,9 @@ async function makeAIRequest(
         stream: false,
         options: {
           temperature: temperature,
-          num_predict: maxTokens
+          num_predict: maxTokens,
+          num_ctx: numCtx,       // Tell Ollama to load the full context window
+          repeat_penalty: 1.1,   // Reduce repetition — important for long structured output
         }
       }),
     });
@@ -412,10 +397,11 @@ async function executeAIRequest(
   // Select model based on task type (now async)
   const model = await getModelForTask(type);
   
-  // Increase max tokens for structured extraction tasks
+  // Increase max tokens for structured extraction tasks.
+  // gemma4:31b has 256K context so we give it room to breathe.
   const effectiveMaxTokens = (type === 'parse-pdf' || type === 'parse-resume' || type === 'parse-jobs-text') 
-    ? Math.max(maxTokens, 8000) // Ensure enough tokens for JSON output
-    : maxTokens;
+    ? Math.max(maxTokens, 16000) // Plenty of room for full JSON output
+    : Math.max(maxTokens, 4096); // At least 4K for chat/other responses
 
   // Try with retries
   for (let attempt = 1; attempt <= 3; attempt++) {

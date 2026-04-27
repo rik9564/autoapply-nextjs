@@ -17,7 +17,9 @@ interface ExtractedJob {
   jobType?: 'fulltime' | 'contract' | 'parttime' | 'internship' | 'unknown';
 }
 
-const CHUNK_SIZE = 15000;
+// gemma4:31b has 256K context (~200K usable tokens).
+// 80K chars ≈ ~20K tokens — well within a single context window, minimising chunk splitting.
+const CHUNK_SIZE = 80000;
 
 async function parsePDF(buffer: Buffer): Promise<string> {
   const uint8Array = new Uint8Array(buffer);
@@ -83,26 +85,32 @@ function parseJobsFromResponse(content: string): ExtractedJob[] {
   }));
 }
 
-const JOB_EXTRACTION_SYSTEM_PROMPT = `You are a job posting parser. Extract ALL job postings from this text.
+const JOB_EXTRACTION_SYSTEM_PROMPT = `You are an expert job posting parser with deep understanding of recruitment documents.
 
-For each job extract:
-- jobTitle: exact title
-- recruiterName: contact person name or "Unknown"
-- recruiterEmail: email address (VERY IMPORTANT)
-- recruiterPhone: phone/mobile number
-- jobDescription: 1-2 sentence summary
-- company: infer from email domain or text
-- location: city/state or "Remote" or ""
-- workType: "remote", "hybrid", "onsite", or "unknown"
-- experienceLevel: e.g., "3-5 years", "Senior"
-- salaryRange: if mentioned, else ""
-- skills: array of key skills
-- jobType: "fulltime", "contract", "internship", or "unknown"
+Your task: Extract EVERY job posting found in the provided text with maximum accuracy.
 
-Return ONLY valid JSON:
-{"jobs":[{"jobTitle":"...","recruiterName":"...","recruiterEmail":"...","recruiterPhone":"...","jobDescription":"...","company":"...","location":"...","workType":"...","experienceLevel":"...","salaryRange":"...","skills":[...],"jobType":"..."}]}
+For each job posting, extract these fields precisely:
+- jobTitle: The exact job title as written
+- recruiterName: Full name of the contact person, or "Unknown" if not found
+- recruiterEmail: Email address — this is CRITICAL, search carefully
+- recruiterPhone: Phone or mobile number including country code if present
+- jobDescription: A clear 2-3 sentence summary capturing the role's purpose, key responsibilities and tech stack
+- company: Company name — infer from email domain (e.g. @google.com → Google) or from text
+- location: City/State/Country, "Remote", "Hybrid" or "" if not mentioned
+- workType: exactly one of "remote", "hybrid", "onsite", "unknown"
+- experienceLevel: e.g. "3-5 years", "Senior", "Entry-level", "10+ years"
+- salaryRange: exact text if present, else ""
+- skills: array of technical and soft skills mentioned — be thorough
+- jobType: exactly one of "fulltime", "contract", "parttime", "internship", "unknown"
 
-No markdown. If no jobs: {"jobs":[]}`;
+RULES:
+1. Extract ALL jobs, even if they look similar — do not skip any
+2. Output ONLY valid JSON, no markdown, no explanation
+3. Escape all special characters inside string values
+4. If no jobs found, return {"jobs":[]}
+
+Required output format:
+{"jobs":[{"jobTitle":"...","recruiterName":"...","recruiterEmail":"...","recruiterPhone":"...","jobDescription":"...","company":"...","location":"...","workType":"...","experienceLevel":"...","salaryRange":"...","skills":[...],"jobType":"..."}]}`;
 
 async function extractJobsFromChunk(
   chunk: string,
@@ -113,9 +121,9 @@ async function extractJobsFromChunk(
     const response = await callAI({
       type: 'parse-pdf',
       systemPrompt: JOB_EXTRACTION_SYSTEM_PROMPT,
-      userPrompt: `Chunk ${chunkIndex + 1}/${totalChunks}. Extract jobs:\n\n${chunk}`,
-      temperature: 0.1,
-      maxTokens: 4000,
+      userPrompt: `Extract all job postings from the following text (chunk ${chunkIndex + 1} of ${totalChunks}):\n\n${chunk}`,
+      temperature: 0.05, // Near-deterministic for structured extraction
+      maxTokens: 16000,  // 31b can produce large JSON payloads reliably
     });
 
     const jobs = parseJobsFromResponse(response.content);
