@@ -62,9 +62,11 @@ async function main() {
   console.log("Available Gemma 4 Models:");
   models.forEach((m, i) => console.log(`  ${i + 1}. ${m.label}`));
 
-  rl.question('\nSelect a model by number (default 1 — gemma4:31b): ', (answer) => {
-    const index = parseInt(answer) - 1;
-    const selected = models[Math.max(0, Math.min(index, models.length - 1))] || models[0];
+  rl.question('\nSelect a model by number (default 3 — gemma4:latest, recommended for most VMs): ', (answer) => {
+    const DEFAULT_INDEX = 2; // gemma4:latest (0-indexed)
+    const parsed = parseInt(answer) - 1;
+    const index = isNaN(parsed) ? DEFAULT_INDEX : Math.max(0, Math.min(parsed, models.length - 1));
+    const selected = models[index];
     const selectedModel = selected.tag;
     console.log(`\n=> Selected model: ${selectedModel}\n`);
     

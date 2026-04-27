@@ -56,9 +56,9 @@ const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
   'gemma4:e2b':    131072,
 };
 
-// Default models — using gemma4:31b since that's the installed model
-const DEFAULT_CHAT_MODEL: ModelId = 'gemma4:31b';
-const DEFAULT_STRUCTURED_MODEL: ModelId = 'gemma4:31b';
+// Default models — gemma4 (9.6GB, 128K context) runs well on most VMs
+const DEFAULT_CHAT_MODEL: ModelId = 'gemma4:latest';
+const DEFAULT_STRUCTURED_MODEL: ModelId = 'gemma4:latest';
 
 // In-memory model cache (refreshed from DB)
 let currentChatModel: ModelId = DEFAULT_CHAT_MODEL;
