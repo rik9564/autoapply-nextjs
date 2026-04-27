@@ -8,59 +8,95 @@ const rl = readline.createInterface({
 
 const models = ['gemma:4b', 'gemma', 'gemma:7b', 'gemma2'];
 
-console.log("==============================================");
-console.log("Welcome to AutoApply NextJS + Ollama Setup");
-console.log("==============================================\n");
+// Default to 127.0.0.1 instead of localhost to avoid IPv6 resolution issues on some machines
+const OLLAMA_URL = process.env.OLLAMA_URL || 'http://127.0.0.1:11434';
 
-console.log("Checking if Ollama is running...");
-try {
-  execSync('curl -s http://localhost:11434/api/version', { stdio: 'ignore' });
-  console.log("✅ Ollama is running.\n");
-} catch (e) {
-  console.log("❌ Ollama does not seem to be running on http://localhost:11434");
-  console.log("Please start Ollama (e.g. run 'ollama serve' in another terminal) and try again.");
-  process.exit(1);
+async function checkOllama() {
+  try {
+    const res = await fetch(`${OLLAMA_URL}/api/version`);
+    if (res.ok) {
+      return true;
+    }
+  } catch (e) {
+    // Also try localhost if 127.0.0.1 fails, just in case
+    if (OLLAMA_URL.includes('127.0.0.1')) {
+      try {
+        const res2 = await fetch(OLLAMA_URL.replace('127.0.0.1', 'localhost') + '/api/version');
+        if (res2.ok) return true;
+      } catch (e2) {
+        return false;
+      }
+    }
+    return false;
+  }
+  return false;
 }
 
-console.log("Available Local Models:");
-models.forEach((m, i) => console.log(`  ${i + 1}. ${m}`));
+async function main() {
+  console.log("==============================================");
+  console.log("Welcome to AutoApply NextJS + Ollama Setup");
+  console.log("==============================================\n");
 
-rl.question('\nSelect a model by number (default 1): ', (answer) => {
-  const index = parseInt(answer) - 1;
-  const selectedModel = models[index] || models[0];
-  console.log(`\n=> Selected model: ${selectedModel}\n`);
+  console.log(`Checking if Ollama is running at ${OLLAMA_URL}...`);
   
-  console.log(`[1/3] Pulling ${selectedModel} via Ollama... (This might take a while if not downloaded)`);
-  try {
-    execSync(`ollama pull ${selectedModel}`, { stdio: 'inherit' });
-    console.log("✅ Model pulled successfully.\n");
-  } catch (err) {
-    console.error("❌ Failed to pull the model.");
+  const isRunning = await checkOllama();
+  
+  if (isRunning) {
+    console.log("✅ Ollama is running.\n");
+  } else {
+    console.log(`❌ Ollama does not seem to be reachable at ${OLLAMA_URL}`);
+    console.log("\nIf Ollama is running on a VM or Docker, make sure you start it with:");
+    console.log("  OLLAMA_HOST=0.0.0.0 ollama serve");
+    console.log("\nYou can also set a custom URL by running:");
+    console.log("  set OLLAMA_URL=http://<YOUR_VM_IP>:11434 && npm run dev  (Windows)");
+    console.log("  OLLAMA_URL=http://<YOUR_VM_IP>:11434 npm run dev      (Mac/Linux)\n");
     process.exit(1);
   }
 
-  console.log("[2/3] Checking npm dependencies...");
-  try {
-    execSync('npm install', { stdio: 'inherit' });
-    console.log("✅ Dependencies installed.\n");
-  } catch (err) {
-    console.error("❌ Failed to install dependencies.");
-    process.exit(1);
-  }
+  console.log("Available Local Models:");
+  models.forEach((m, i) => console.log(`  ${i + 1}. ${m}`));
 
-  console.log(`[3/3] Starting Next.js development server...`);
-  const npmCmd = /^win/.test(process.platform) ? 'npm.cmd' : 'npm';
-  
-  // Set the default model so the app knows which one to use if we wanted to pass it via env
-  // (We'll just rely on the fallback or user settings, but it's good to pull it)
-  const devProcess = spawn(npmCmd, ['run', 'next:dev'], { 
-    stdio: 'inherit',
-    env: { ...process.env, NEXT_PUBLIC_DEFAULT_MODEL: selectedModel } 
+  rl.question('\nSelect a model by number (default 1): ', (answer) => {
+    const index = parseInt(answer) - 1;
+    const selectedModel = models[index] || models[0];
+    console.log(`\n=> Selected model: ${selectedModel}\n`);
+    
+    console.log(`[1/3] Pulling ${selectedModel} via Ollama... (This might take a while if not downloaded)`);
+    try {
+      // Allow overriding the ollama host for pulling too
+      const ollamaHost = OLLAMA_URL.replace('http://', '').replace('https://', '');
+      execSync(`ollama pull ${selectedModel}`, { 
+        stdio: 'inherit',
+        env: { ...process.env, OLLAMA_HOST: ollamaHost }
+      });
+      console.log("✅ Model pulled successfully.\n");
+    } catch (err) {
+      console.error("⚠️  Could not pull the model using local 'ollama' CLI. If Ollama is remote, make sure the model is pulled there.");
+    }
+
+    console.log("[2/3] Checking npm dependencies...");
+    try {
+      execSync('npm install', { stdio: 'inherit' });
+      console.log("✅ Dependencies installed.\n");
+    } catch (err) {
+      console.error("❌ Failed to install dependencies.");
+      process.exit(1);
+    }
+
+    console.log(`[3/3] Starting Next.js development server...`);
+    const npmCmd = /^win/.test(process.platform) ? 'npm.cmd' : 'npm';
+    
+    const devProcess = spawn(npmCmd, ['run', 'next:dev'], { 
+      stdio: 'inherit',
+      env: { ...process.env, NEXT_PUBLIC_DEFAULT_MODEL: selectedModel, OLLAMA_URL: OLLAMA_URL } 
+    });
+
+    devProcess.on('close', (code) => {
+      process.exit(code);
+    });
+
+    rl.close();
   });
+}
 
-  devProcess.on('close', (code) => {
-    process.exit(code);
-  });
-
-  rl.close();
-});
+main().catch(console.error);
