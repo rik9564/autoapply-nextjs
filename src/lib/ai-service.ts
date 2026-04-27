@@ -124,7 +124,7 @@ async function getModelForTask(type: string): Promise<string> {
   await loadModelSettings();
   
   // Use structured model for JSON extraction tasks (resume parsing)
-  if (type === 'parse-pdf' || type === 'parse-resume') {
+  if (type === 'parse-pdf' || type === 'parse-resume' || type === 'parse-jobs-text') {
     return currentStructuredModel;
   }
   // Use chat model for general chat
@@ -145,7 +145,7 @@ const MAX_MEMORY_CACHE_SIZE = 100;
 const pendingRequests = new Map<string, Promise<AIResponse>>();
 
 interface AIRequestOptions {
-  type: 'parse-resume' | 'parse-pdf' | 'chat';
+  type: 'parse-resume' | 'parse-pdf' | 'parse-jobs-text' | 'chat';
   systemPrompt: string;
   userPrompt: string;
   temperature?: number;

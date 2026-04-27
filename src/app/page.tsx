@@ -611,7 +611,7 @@ export default function Page() {
     setParsingJobText(true);
 
     try {
-      const response = await fetch("/api/parse-jobs-text", {
+      const response = await fetch("/api/extract-jobs-text", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ text: jobTextInput }),
@@ -1167,10 +1167,14 @@ export default function Page() {
                   )}
                   
                   {/* Contact Info - IMPORTANT */}
-                  {(job.recruiterEmail || job.recruiterPhone) && (
+                  {(job.recruiterEmail || job.recruiterPhone) ? (
                     <div className="flex flex-wrap items-center gap-2 text-[10px] text-[#2E8B57] mb-2 bg-[#2E8B57]/10 px-2 py-1 rounded border border-[#2E8B57]/20">
                       {job.recruiterEmail && <span>📧 {job.recruiterEmail}</span>}
                       {job.recruiterPhone && <span>📱 {job.recruiterPhone}</span>}
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-1 text-[10px] text-[#525252] mb-2 bg-[#1A1A1A] px-2 py-1 rounded border border-[#2F2F2F]">
+                      <span>No email — cannot auto-apply</span>
                     </div>
                   )}
                   
@@ -1710,13 +1714,13 @@ export default function Page() {
             <div className="p-4 overflow-auto flex-1 space-y-4">
               {/* Instructions */}
               <div className="p-3 bg-[#0F0F0F] border border-[#1F1F1F] rounded">
-                <h4 className="text-xs font-medium text-[#EDEDED] mb-2">📋 Paste text containing job postings</h4>
+                <h4 className="text-xs font-medium text-[#EDEDED] mb-2">📋 Paste Job Curator text or any job postings</h4>
                 <p className="text-[11px] text-[#A1A1A1] leading-relaxed">
                   The AI will extract job details including: job titles, HR emails, experience requirements, skills, 
                   company names, and more. You can paste multiple job postings at once.
                 </p>
                 <div className="mt-2 text-[10px] text-[#525252]">
-                  <span className="font-medium">Supported formats:</span> HR emails, job listings, recruitment messages, LinkedIn messages, etc.
+                  <span className="font-medium">Tip:</span> Paste the full Job Curator daily dump — jobs separated by ===== lines are automatically split and processed in batches.
                 </div>
               </div>
               
