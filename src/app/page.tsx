@@ -59,6 +59,7 @@ const Input = ({ label, ...props }: InputProps) => (
 
 export default function Page() {
   const [candidate, setCandidate] = useState<Candidate>({ name: "", email: "", phone: "", experience: undefined });
+  const [experienceMonths, setExperienceMonths] = useState<number | undefined>(undefined);
   const [resumeFile, setResumeFile] = useState<File | null>(null);
   const [resumeBase64, setResumeBase64] = useState<string>("");
   const [jobs, setJobs] = useState<Job[]>([]);
@@ -164,6 +165,18 @@ export default function Page() {
       setPreviewJobEmail(null);
     }
   }, [previewJob, emailTemplate, candidate]);
+
+  // Format experience as "X years Y months" for display
+  const formatExperience = (years: number | undefined, months: number | undefined): string => {
+    if (years === undefined && months === undefined) return '';
+    const y = years ?? 0;
+    const m = months ?? 0;
+    if (y === 0 && m === 0) return '0 years';
+    const parts: string[] = [];
+    if (y > 0) parts.push(`${y} year${y !== 1 ? 's' : ''}`);
+    if (m > 0) parts.push(`${m} month${m !== 1 ? 's' : ''}`);
+    return parts.join(' ');
+  };
 
   // Helper function to check if user experience falls within job's required range
   const parseExperienceRange = (experienceLevel: string | undefined): { min: number; max: number } | null => {
@@ -688,24 +701,43 @@ export default function Page() {
               <Input label="Email" value={candidate.email} onChange={(e: ChangeEvent<HTMLInputElement>) => setCandidate({ ...candidate, email: e.target.value })} placeholder="alex@work.com" />
               <Input label="Phone" value={candidate.phone} onChange={(e: ChangeEvent<HTMLInputElement>) => setCandidate({ ...candidate, phone: e.target.value })} placeholder="+91 9564607487" />
               <div className="space-y-1.5">
-                <label className="text-xs uppercase font-semibold text-[#525252] tracking-wider ml-0.5">Experience (Years)</label>
+                <label className="text-xs uppercase font-semibold text-[#525252] tracking-wider ml-0.5">Experience</label>
                 <div className="flex items-center gap-2">
                   <input 
                     type="number" 
                     min="0" 
                     max="50"
-                    value={candidate.experience ?? ''}
+                    value={candidate.experience !== undefined ? Math.floor(candidate.experience) : ''}
                     onChange={(e: ChangeEvent<HTMLInputElement>) => {
-                      const val = e.target.value;
-                      setCandidate({ ...candidate, experience: val === '' ? undefined : parseInt(val) });
+                      const yrs = e.target.value === '' ? undefined : parseInt(e.target.value);
+                      const mos = experienceMonths ?? 0;
+                      const total = yrs !== undefined ? yrs + mos / 12 : undefined;
+                      setCandidate({ ...candidate, experience: total });
+                      if (yrs === undefined) setExperienceMonths(undefined);
                     }}
                     placeholder="4"
-                    className="w-20 h-10 px-3 text-sm bg-[#0A0A0A] border border-[#1F1F1F] rounded focus:border-[#525252] focus:bg-[#0F0F0F] transition-colors text-center"
+                    className="w-16 h-10 px-3 text-sm bg-[#0A0A0A] border border-[#1F1F1F] rounded focus:border-[#525252] focus:bg-[#0F0F0F] transition-colors text-center"
                   />
-                  <span className="text-xs text-[#525252]">years</span>
+                  <span className="text-xs text-[#525252]">yr</span>
+                  <input 
+                    type="number" 
+                    min="0" 
+                    max="11"
+                    value={experienceMonths ?? ''}
+                    onChange={(e: ChangeEvent<HTMLInputElement>) => {
+                      const mos = e.target.value === '' ? undefined : Math.min(11, parseInt(e.target.value));
+                      setExperienceMonths(mos);
+                      const yrs = candidate.experience !== undefined ? Math.floor(candidate.experience) : 0;
+                      const total = (yrs + (mos ?? 0) / 12);
+                      setCandidate({ ...candidate, experience: (yrs === 0 && mos === undefined) ? undefined : total });
+                    }}
+                    placeholder="0"
+                    className="w-16 h-10 px-3 text-sm bg-[#0A0A0A] border border-[#1F1F1F] rounded focus:border-[#525252] focus:bg-[#0F0F0F] transition-colors text-center"
+                  />
+                  <span className="text-xs text-[#525252]">mo</span>
                   {candidate.experience !== undefined && (
                     <span className="text-[10px] text-[#2E8B57] ml-auto">
-                      Filtering jobs
+                      Filtering
                     </span>
                   )}
                 </div>
@@ -1060,7 +1092,7 @@ export default function Page() {
                 <>
                   <span className="text-[#2E8B57] font-medium">{filteredJobs.length}</span> 
                   <span>of {jobs.length} match</span>
-                  <span className="text-[#D4AF37]">({candidate.experience}yr exp)</span>
+                  <span className="text-[#D4AF37]">({formatExperience(candidate.experience !== undefined ? Math.floor(candidate.experience) : undefined, experienceMonths)})</span>
                 </>
               ) : (
                 <>

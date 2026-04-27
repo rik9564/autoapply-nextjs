@@ -101,8 +101,8 @@ Your goal is to extract a complete and accurate structured profile from the resu
 EXPERIENCE CALCULATION RULES:
 - Calculate totalYearsExperience by summing ALL unique work periods (do not double-count overlapping roles)
 - "Present" means today: April 2026
-- Example: Jan 2022 – Present = 4.3 years; Jul 2024 – Present = 1.75 years
-- Round to one decimal place
+- Express duration as "X years Y months" — e.g. "4 years 5 months", "2 years 0 months", "0 years 8 months"
+- For totalYearsExperience use a decimal: 4 years 5 months = 4.42, 2 years 6 months = 2.5
 
 SKILLS EXTRACTION:
 - Be exhaustive — extract ALL technical skills: languages, frameworks, libraries, cloud platforms, databases, tools, CI/CD, methodologies, soft skills
@@ -120,7 +120,7 @@ Return ONLY valid JSON with this exact structure (no markdown, no explanation):
     {
       "title": "Job Title",
       "company": "Company Name",
-      "duration": "Jan 2022 – Present (4.3 years)",
+      "duration": "Jan 2022 – Present (4 years 3 months)",
       "highlights": ["Quantified achievement 1", "Achievement 2", "Achievement 3"]
     }
   ],

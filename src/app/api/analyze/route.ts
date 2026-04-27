@@ -1,6 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getActiveResumeAnalysis, getResumeAnalysisById, ResumeAnalysis } from "@/lib/resume-service";
 
+function formatYears(decimal: number): string {
+  const years = Math.floor(decimal);
+  const months = Math.round((decimal - years) * 12);
+  const parts: string[] = [];
+  if (years > 0) parts.push(`${years} year${years !== 1 ? 's' : ''}`);
+  if (months > 0) parts.push(`${months} month${months !== 1 ? 's' : ''}`);
+  return parts.length > 0 ? parts.join(' ') : '0 years';
+}
+
 interface ResumeProfile {
   name: string;
   skills: string[];
@@ -73,16 +82,16 @@ function analyzeSkillMatch(
     
     if (candidateExperience >= requiredYears) {
       experienceMatch = "strong";
-      experienceNotes = `${candidateExperience} years experience meets ${requiredExperience} requirement`;
+      experienceNotes = `${formatYears(candidateExperience)} experience meets ${requiredExperience} requirement`;
     } else if (candidateExperience >= requiredYears - 2) {
       experienceMatch = "moderate";
-      experienceNotes = `${candidateExperience} years is slightly below ${requiredExperience} requirement`;
+      experienceNotes = `${formatYears(candidateExperience)} is slightly below ${requiredExperience} requirement`;
     } else {
       experienceMatch = "weak";
-      experienceNotes = `${candidateExperience} years is below ${requiredExperience} requirement`;
+      experienceNotes = `${formatYears(candidateExperience)} is below ${requiredExperience} requirement`;
     }
   } else {
-    experienceNotes = `Candidate has ${candidateExperience} years of experience`;
+    experienceNotes = `Candidate has ${formatYears(candidateExperience)} of experience`;
   }
   
   // Adjust score based on experience
