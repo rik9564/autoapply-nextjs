@@ -1,4 +1,4 @@
-const { execSync, spawn } = require('child_process');
+const { execSync } = require('child_process');
 const readline = require('readline');
 
 const rl = readline.createInterface({
@@ -98,21 +98,18 @@ async function main() {
 
     console.log(`[3/3] Starting Next.js development server on http://localhost:4000 ...\n`);
 
-    const isWindows = /^win/.test(process.platform);
-    const devProcess = spawn('npm', ['run', 'next:dev'], { 
-      stdio: 'inherit',
-      shell: true, // required on Windows to resolve npm correctly
-      env: { ...process.env, NEXT_PUBLIC_DEFAULT_MODEL: selectedModel, OLLAMA_URL: OLLAMA_URL } 
-    });
-
-    devProcess.on('error', (err) => {
-      console.error('Failed to start Next.js server:', err.message);
-      process.exit(1);
-    });
-
-    devProcess.on('close', (code) => {
-      process.exit(code ?? 0);
-    });
+    // Use execSync so we avoid the shell:true + args deprecation warning (DEP0190).
+    // execSync blocks, which is fine here since this is the last thing the script does.
+    try {
+      execSync('npm run next:dev', {
+        stdio: 'inherit',
+        env: { ...process.env, NEXT_PUBLIC_DEFAULT_MODEL: selectedModel, OLLAMA_URL: OLLAMA_URL },
+        shell: true,
+      });
+    } catch (err) {
+      // Next.js exits with non-zero when killed via Ctrl+C — that's normal, don't print an error
+      process.exit(0);
+    }
   });
 }
 
