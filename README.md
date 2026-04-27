@@ -1,36 +1,82 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# AutoApply - AI-Powered Job Application Automation
 
-## Getting Started
+An intelligent job application system with email automation, resume parsing, and AI-powered cover letter generation.
 
-First, run the development server:
+## Features
 
-```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+- 🤖 **Blazing Fast AI via Groq** - Uses Llama 3.3 70B with ultra-fast inference
+- 📧 **Email Automation** - Dual Gmail SMTP with 940 auto-send emails/day
+- 📄 **Resume Parsing** - AI-powered extraction from PDFs and text
+- 💾 **Smart Caching** - L1 memory + L2 Supabase database caching
+- ✉️ **Preview & Edit** - Edit emails before sending with live preview
+- 🔄 **Duplicate Detection** - Prevents re-applying to same company
+
+## Setup
+
+### 1. Get Groq API Key
+
+1. Go to [console.groq.com/keys](https://console.groq.com/keys)
+2. Sign up and create an API key
+3. Add to `.env.local`:
+
+```env
+GROQ_API_KEY=your_api_key_here
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### 2. Configure Gmail SMTP
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Enable 2-Step Verification on your Gmail accounts, then:
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+1. Go to Google Account → Security → 2-Step Verification → App passwords
+2. Generate app password for "Mail"
+3. Add to `.env.local`:
 
-## Learn More
+```env
+SMTP_USER_1=your_email@gmail.com
+SMTP_PASS_1=your_app_password
 
-To learn more about Next.js, take a look at the following resources:
+SMTP_USER_2=your_second_email@gmail.com
+SMTP_PASS_2=your_app_password
+```
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+### 3. Setup Supabase
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+1. Create project at [supabase.com](https://supabase.com)
+2. Run the SQL migrations in the project
+3. Add to `.env.local`:
 
-## Deploy on Vercel
+```env
+SUPABASE_URL=https://your-project.supabase.co
+SUPABASE_ANON_KEY=your_anon_key
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+### 4. Run the App
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm install
+npm run dev
+```
+
+Open [http://localhost:4000](http://localhost:4000) in your browser.
+
+## Environment Variables
+
+See `.env.example` for all required variables.
+
+| Variable | Description |
+|----------|-------------|
+| `GROQ_API_KEY` | Your Groq API key |
+| `SMTP_USER_1` | Primary Gmail address |
+| `SMTP_PASS_1` | Primary Gmail app password |
+| `SMTP_USER_2` | Secondary Gmail address |
+| `SMTP_PASS_2` | Secondary Gmail app password |
+| `SUPABASE_URL` | Supabase project URL |
+| `SUPABASE_ANON_KEY` | Supabase anonymous key |
+
+## Tech Stack
+
+- **Next.js 16** with React 19
+- **Groq** for AI (Llama 3.3 70B - ultra fast!)
+- **Supabase** for database and caching
+- **Nodemailer** for SMTP email
+- **TailwindCSS** for styling
