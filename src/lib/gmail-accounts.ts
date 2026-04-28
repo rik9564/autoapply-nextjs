@@ -91,7 +91,6 @@ export async function getActiveAccounts(forceRefresh = false): Promise<EmailAcco
       .update({
         sent_today: 0,
         is_exhausted: false,
-        last_error: null,
         last_reset_at: new Date().toISOString(),
       })
       .in('id', staleIds)

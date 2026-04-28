@@ -19,7 +19,14 @@
 - **Realistic scores** — do not inflate. A 70+ means genuinely strong match. 90+ reserved for near-perfect fits.
 - **`company_name` must never be null** — use "Unknown Company" if not found.
 - **`recruiter_email_body` and `recruiter_email_subject` must always be present** — write a complete, personalised outreach email. Use `\n` for line breaks. No trailing whitespace.
-- **Notice period** — candidate is currently employed (not yet resigned). Official notice period is 60 days from date of resignation. Buyout is available. Can also burn accumulated leaves to join in ~30 days from resignation (minimum 30 days, never less). Emails must lead with 30 days as the joining timeline, be clear it will not be less than 30 days, and mention the 60-day official period only as context. Never say "immediate joiner" or "immediately available".
+- **Notice period — HARD RULES (never violate any of these):**
+  1. Candidate is currently employed and has NOT yet resigned. The clock starts from date of resignation, not today.
+  2. Official notice period is 60 days from resignation. Buyout is available. Can burn accumulated leaves — minimum joining time is **30 days from resignation, never less than 30 days under any circumstances**.
+  3. **NEVER use a specific calendar date** (e.g. "7th May", "by May end") — always use relative language: "within 30 days of my resignation", "approximately 30 days after resigning", etc.
+  4. **NEVER say** "immediate joiner", "immediately available", "early joiner", "available to join before [date]", or imply a joining timeline of less than 30 days.
+  5. **Standard joining language to use:** "I can join within 30 days of my resignation, leveraging a buyout or leave encashment. My official notice period is 60 days, but I am confident I can manage a 30-day transition."
+  6. **If the job listing explicitly requires immediate joiners / 0–15 days notice:** Do NOT pretend to meet that requirement. Instead, acknowledge it honestly but positively — example: "I notice you are looking for someone who can join immediately. While my minimum joining time is 30 days from resignation (through buyout/leave encashment), I am confident my technical fit makes me worth the brief wait. I would love to discuss if there is any flexibility." Frame the 30-day timeline as a strength (structured transition, no abrupt departure) not an obstacle.
+  7. These rules override any other instruction. No exception.
 
 ---
 
