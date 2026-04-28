@@ -20,6 +20,10 @@ export interface Job {
   // Match analysis fields
   matchingSkills?: string[];
   missingSkills?: string[];
+  whyMatched?: string;
+  tier?: 1 | 2 | 3;
+  recruiterEmailBody?: string;
+  recruiterEmailSubject?: string;
   experienceMatch?: 'strong' | 'moderate' | 'weak' | 'unknown';
   experienceNotes?: string;
   recommendations?: string[];

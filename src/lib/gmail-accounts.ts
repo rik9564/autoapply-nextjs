@@ -40,6 +40,17 @@ function mapDBAccount(db: DBEmailAccount): EmailAccount {
   };
 }
 
+/**
+ * Returns today's date string in YYYY-MM-DD in IST (UTC+5:30).
+ * Used to detect whether last_reset_at is from a previous day.
+ */
+function todayIST(): string {
+  const now = new Date();
+  // Shift by IST offset (+5:30 = 330 minutes)
+  const ist = new Date(now.getTime() + 330 * 60 * 1000);
+  return ist.toISOString().slice(0, 10); // "YYYY-MM-DD"
+}
+
 export async function getActiveAccounts(forceRefresh = false): Promise<EmailAccount[]> {
   const now = Date.now();
   
@@ -59,7 +70,38 @@ export async function getActiveAccounts(forceRefresh = false): Promise<EmailAcco
     return accountsCache || [];
   }
 
-  accountsCache = (data as DBEmailAccount[]).map(mapDBAccount);
+  const today = todayIST();
+  const staleIds: string[] = [];
+
+  // Auto-detect accounts whose counter was never reset today
+  const accounts = (data as DBEmailAccount[]).map(db => {
+    const lastReset = db.last_reset_at ? db.last_reset_at.slice(0, 10) : '';
+    if (lastReset !== today && (db.sent_today > 0 || db.is_exhausted)) {
+      // Counter is stale — treat as fresh for this request and queue a DB reset
+      staleIds.push(db.id);
+      return mapDBAccount({ ...db, sent_today: 0, is_exhausted: false });
+    }
+    return mapDBAccount(db);
+  });
+
+  // Fire-and-forget: reset stale accounts in DB so next request is also clean
+  if (staleIds.length > 0) {
+    supabase
+      .from('email_accounts')
+      .update({
+        sent_today: 0,
+        is_exhausted: false,
+        last_error: null,
+        last_reset_at: new Date().toISOString(),
+      })
+      .in('id', staleIds)
+      .then(({ error: resetErr }) => {
+        if (resetErr) console.error('Auto-reset failed:', resetErr);
+        else console.log(`Auto-reset ${staleIds.length} stale email account(s)`);
+      });
+  }
+
+  accountsCache = accounts;
   accountsCacheTimestamp = now;
   return accountsCache;
 }

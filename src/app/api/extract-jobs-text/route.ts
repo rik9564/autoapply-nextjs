@@ -1,5 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
-import { callAI, parseAIJSON, checkProxyHealth } from "@/lib/ai-service";
+import {
+  groqChatWithRetry,
+  processBatches,
+  parseGroqJSON,
+  EXTRACTION_MODEL,
+} from "@/lib/groq";
 
 interface ExtractedJob {
   jobTitle: string;
@@ -9,17 +14,16 @@ interface ExtractedJob {
   jobDescription: string;
   company?: string;
   location?: string;
-  workType?: 'remote' | 'hybrid' | 'onsite' | 'unknown';
+  workType?: "remote" | "hybrid" | "onsite" | "unknown";
   experienceLevel?: string;
   salaryRange?: string;
   skills?: string[];
-  jobType?: 'fulltime' | 'contract' | 'parttime' | 'internship' | 'unknown';
+  jobType?: "fulltime" | "contract" | "parttime" | "internship" | "unknown";
 }
 
-// Job Curator separator pattern
+// ─── Text cleaning ─────────────────────────────────────────────────────────────
 const JOB_SEPARATOR = /={5,}/;
 
-// Noise patterns from Job Curator channel headers/footers
 const NOISE_PATTERNS = [
   /Shared by Job Curator[^\n]*/gi,
   /Join us on Telegram[^\n]*/gi,
@@ -29,59 +33,27 @@ const NOISE_PATTERNS = [
   /For more (jobs|opportunities)[^\n]*/gi,
   /Follow us[^\n]*/gi,
   /Subscribe[^\n]*/gi,
+  /This document is for Subscribed Members[^\n]*/gi,
 ];
-
-// How many job listing blocks to send per AI call (balance throughput vs context)
-const JOBS_PER_CHUNK = 10;
 
 function stripNoise(text: string): string {
   let cleaned = text;
   for (const pattern of NOISE_PATTERNS) {
-    cleaned = cleaned.replace(pattern, '');
+    cleaned = cleaned.replace(pattern, "");
   }
-  // Collapse excessive blank lines
-  cleaned = cleaned.replace(/\n{4,}/g, '\n\n\n');
+  cleaned = cleaned.replace(/\n{4,}/g, "\n\n\n");
   return cleaned.trim();
 }
 
 function splitJobBlocks(text: string): string[] {
-  // Split on separator lines (5+ equals signs)
-  const blocks = text.split(JOB_SEPARATOR);
-
-  // Filter out empty/noise-only blocks
-  return blocks
-    .map(b => b.trim())
-    .filter(b => b.length > 30); // At least 30 chars to be a real listing
+  return text
+    .split(JOB_SEPARATOR)
+    .map((b) => b.trim())
+    .filter((b) => b.length > 30);
 }
 
-function batchBlocks(blocks: string[], batchSize: number): string[][] {
-  const batches: string[][] = [];
-  for (let i = 0; i < blocks.length; i += batchSize) {
-    batches.push(blocks.slice(i, i + batchSize));
-  }
-  return batches;
-}
-
-function parseJobsFromResponse(content: string): ExtractedJob[] {
-  const parsed = parseAIJSON<{ jobs: ExtractedJob[] } | ExtractedJob[]>(content);
-
-  if (parsed) {
-    if (Array.isArray(parsed)) return parsed;
-    if ('jobs' in parsed && Array.isArray(parsed.jobs)) return parsed.jobs;
-  }
-
-  // Fallback regex
-  const jobPattern = /"jobTitle"\s*:\s*"([^"]+)"/g;
-  const titles: string[] = [];
-  let m: RegExpExecArray | null;
-  while ((m = jobPattern.exec(content)) !== null) {
-    titles.push(m[1]);
-  }
-  console.warn(`  Regex fallback found ${titles.length} job titles`);
-  return [];
-}
-
-const JOB_EXTRACTION_SYSTEM_PROMPT = `You are an expert job posting parser for Indian IT job listings.
+// ─── AI prompt ─────────────────────────────────────────────────────────────────
+const SYSTEM_PROMPT = `You are an expert job posting parser for Indian IT job listings.
 
 Your task: Extract EVERY job posting from the text and return them as JSON.
 
@@ -108,33 +80,53 @@ RULES:
 Output format:
 {"jobs":[{"jobTitle":"","recruiterName":"","recruiterEmail":"","recruiterPhone":"","jobDescription":"","company":"","location":"","workType":"unknown","experienceLevel":"","salaryRange":"","skills":[],"jobType":"unknown"}]}`;
 
-async function extractJobsFromBatch(
+async function extractBatch(
   batch: string[],
   batchIndex: number,
   totalBatches: number
 ): Promise<ExtractedJob[]> {
   const combinedText = batch
     .map((b, i) => `--- JOB LISTING ${i + 1} ---\n${b}`)
-    .join('\n\n');
+    .join("\n\n");
 
   try {
-    const response = await callAI({
-      type: 'parse-jobs-text',
-      systemPrompt: JOB_EXTRACTION_SYSTEM_PROMPT,
-      userPrompt: `Extract all job postings from these ${batch.length} listings (batch ${batchIndex + 1} of ${totalBatches}):\n\n${combinedText}`,
+    const completion = await groqChatWithRetry({
+      model: EXTRACTION_MODEL,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        {
+          role: "user",
+          content: `Extract all job postings from these ${batch.length} listings (batch ${batchIndex + 1} of ${totalBatches}):\n\n${combinedText}`,
+        },
+      ],
       temperature: 0.05,
-      maxTokens: 16000,
+      max_tokens: 8192,
+      response_format: { type: "json_object" },
     });
 
-    const jobs = parseJobsFromResponse(response.content);
-    console.log(`  Batch ${batchIndex + 1}/${totalBatches}: Found ${jobs.length} jobs (cached: ${response.cached})`);
-    return jobs;
+    const content = completion.choices[0]?.message?.content ?? "";
+    const parsed = parseGroqJSON<{ jobs: ExtractedJob[] } | ExtractedJob[]>(content);
+
+    if (parsed) {
+      if (Array.isArray(parsed)) {
+        console.log(`  Batch ${batchIndex + 1}/${totalBatches}: ${parsed.length} jobs`);
+        return parsed;
+      }
+      if ("jobs" in parsed && Array.isArray(parsed.jobs)) {
+        console.log(`  Batch ${batchIndex + 1}/${totalBatches}: ${parsed.jobs.length} jobs`);
+        return parsed.jobs;
+      }
+    }
+
+    console.warn(`  Batch ${batchIndex + 1}/${totalBatches}: parse failed`);
+    return [];
   } catch (error) {
     console.error(`  Batch ${batchIndex + 1} error:`, error);
     return [];
   }
 }
 
+// ─── Dedup ─────────────────────────────────────────────────────────────────────
 function deduplicateJobs(jobs: ExtractedJob[]): ExtractedJob[] {
   const seen = new Map<string, ExtractedJob>();
 
@@ -146,100 +138,60 @@ function deduplicateJobs(jobs: ExtractedJob[]): ExtractedJob[] {
     if (!seen.has(key)) {
       seen.set(key, job);
     } else {
-      // Keep the more complete entry
       const existing = seen.get(key)!;
       const score = (j: ExtractedJob) =>
-        (j.jobDescription?.length || 0) +
-        (j.skills?.length || 0) * 10 +
+        (j.jobDescription?.length ?? 0) +
+        (j.skills?.length ?? 0) * 10 +
         (j.recruiterEmail ? 20 : 0) +
         (j.company ? 5 : 0);
-      if (score(job) > score(existing)) {
-        seen.set(key, job);
-      }
+      if (score(job) > score(existing)) seen.set(key, job);
     }
   }
 
   return Array.from(seen.values());
 }
 
+// ─── Route ─────────────────────────────────────────────────────────────────────
+const JOBS_PER_BATCH = 20;
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const rawText: string = body.text || '';
+    const rawText: string = body.text ?? "";
 
     if (!rawText.trim()) {
       return NextResponse.json({ error: "No text provided" }, { status: 400 });
     }
 
     console.log(`\n${"=".repeat(60)}`);
-    console.log(`EXTRACT JOBS FROM TEXT: ${rawText.length} characters`);
+    console.log(`EXTRACT JOBS (text): ${rawText.length} chars`);
 
-    // Health check
-    const health = await checkProxyHealth();
-    if (!health.ok) {
-      console.error("Ollama not running:", health.message);
-      return NextResponse.json({ jobs: [], message: health.message });
-    }
-
-    // 1. Strip noise
     const cleaned = stripNoise(rawText);
-    console.log(`  After noise stripping: ${cleaned.length} chars`);
-
-    // 2. Split into individual job blocks
     const blocks = splitJobBlocks(cleaned);
-    console.log(`  Job blocks found: ${blocks.length}`);
+    console.log(`  Blocks: ${blocks.length}`);
 
     if (blocks.length === 0) {
       return NextResponse.json({
         jobs: [],
-        message: "No job listings found. Make sure the text contains job postings separated by ===== lines.",
+        message: "No job listings found. Ensure text has ===== separators.",
         totalFound: 0,
       });
     }
 
-    // 3. Batch blocks for AI processing
-    const batches = batchBlocks(blocks, JOBS_PER_CHUNK);
-    console.log(`  Processing in ${batches.length} batches of up to ${JOBS_PER_CHUNK} jobs each`);
-
-    // 4. Extract jobs from each batch
-    const allJobs: ExtractedJob[] = [];
-    for (let i = 0; i < batches.length; i++) {
-      const jobs = await extractJobsFromBatch(batches[i], i, batches.length);
-      allJobs.push(...jobs);
-
-      // Small delay between batches
-      if (i < batches.length - 1) {
-        await new Promise(resolve => setTimeout(resolve, 300));
-      }
-    }
-
-    console.log(`  Total jobs before dedup: ${allJobs.length}`);
-
-    // 5. Deduplicate
+    const allJobs = await processBatches(blocks, JOBS_PER_BATCH, extractBatch);
     const uniqueJobs = deduplicateJobs(allJobs);
-    console.log(`  Unique jobs after dedup: ${uniqueJobs.length}`);
 
-    const withEmail = uniqueJobs.filter(j => j.recruiterEmail).length;
-    const withoutEmail = uniqueJobs.length - withEmail;
-
-    console.log(`  With email: ${withEmail}, Without email: ${withoutEmail}`);
-    uniqueJobs.slice(0, 10).forEach((job, i) => {
-      console.log(`    ${i + 1}. ${job.jobTitle} @ ${job.company || '?'} | ${job.recruiterEmail || 'no email'}`);
-    });
-    if (uniqueJobs.length > 10) {
-      console.log(`    ... and ${uniqueJobs.length - 10} more`);
-    }
+    const withEmail = uniqueJobs.filter((j) => j.recruiterEmail).length;
+    console.log(`  Total: ${allJobs.length} → unique: ${uniqueJobs.length} (${withEmail} with email)`);
     console.log(`${"=".repeat(60)}\n`);
 
     return NextResponse.json({
       jobs: uniqueJobs,
       totalFound: uniqueJobs.length,
       withEmail,
-      withoutEmail,
+      withoutEmail: uniqueJobs.length - withEmail,
       blocksFound: blocks.length,
-      batchesProcessed: batches.length,
     });
-
   } catch (error) {
     console.error("Extract jobs error:", error);
     return NextResponse.json(

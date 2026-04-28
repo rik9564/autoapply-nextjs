@@ -1,105 +1,201 @@
 @import "tailwindcss";
 
-:root {
-  /* OBSIDIAN THEME (Linear-Inspired) */
-  --bg-page: #050505;
-  --bg-panel: #0F0F0F;
-  --bg-panel-hover: #141414;
-  
-  --border-subtle: #1F1F1F;
-  --border-hover: #2F2F2F;
-  
-  --fg-primary: #EDEDED;
-  --fg-secondary: #A1A1A1;
-  --fg-tertiary: #525252;
-  
-  --accent-primary: #D1D1D1; /* Subtle white accent */
-  --accent-active: #FFFFFF;
-  
-  /* STATUS */
-  --status-success: #2E8B57;
-  --status-success-bg: rgba(46, 139, 87, 0.1);
-  
-  --status-warning: #D4AF37;
-  --status-warning-bg: rgba(212, 175, 55, 0.1);
-  
-  --status-error: #B22222;
-  --status-error-bg: rgba(178, 34, 34, 0.1);
+/* ============================================================
+   OBSIDIAN DESIGN SYSTEM — AutoApply V3
+   Skill guidance: tailwind-design-system (OKLCH tokens in @theme)
+   impeccable: "SRE at 2am" scene → dark is correct. Restrained
+   color strategy: tinted neutrals + one accent ≤10%.
+   ============================================================ */
 
-  /* UTILS */
+:root {
+  /* Palette — tinted toward hue 160 (cool-green, not pure gray) */
+  --bg-page:         oklch(5%  0.003 160);
+  --bg-panel:        oklch(8%  0.003 160);
+  --bg-panel-hover:  oklch(10% 0.003 160);
+  --bg-elevated:     oklch(12% 0.003 160);
+
+  --border-subtle:   oklch(16% 0.003 160);
+  --border-hover:    oklch(22% 0.003 160);
+  --border-focus:    oklch(40% 0.003 160);
+
+  --fg-primary:      oklch(93% 0.003 160);
+  --fg-secondary:    oklch(67% 0.003 160);
+  --fg-tertiary:     oklch(38% 0.003 160);
+  --fg-disabled:     oklch(28% 0.003 160);
+
+  /* Accent — sea green. Restrained: ≤10% of surface area */
+  --accent:          oklch(55% 0.12  160);
+  --accent-muted:    oklch(55% 0.12  160 / 0.15);
+  --accent-border:   oklch(55% 0.12  160 / 0.30);
+  --accent-hover:    oklch(60% 0.12  160);
+
+  /* Status */
+  --status-success:     oklch(55% 0.12  160);
+  --status-success-bg:  oklch(55% 0.12  160 / 0.10);
+  --status-warning:     oklch(76% 0.11  80);
+  --status-warning-bg:  oklch(76% 0.11  80  / 0.10);
+  --status-error:       oklch(50% 0.16  25);
+  --status-error-bg:    oklch(50% 0.16  25  / 0.10);
+
+  /* Radius */
   --radius-sm: 4px;
   --radius-md: 6px;
   --radius-lg: 8px;
-  
-  --shadow-sm: 0 1px 2px rgba(0,0,0,0.4);
-  --shadow-lg: 0 8px 16px rgba(0,0,0,0.5);
-  
-  --font-mono: 'JetBrains Mono', monospace;
+  --radius-xl: 12px;
+
+  /* Shadows — elevation system */
+  --shadow-sm: 0 1px 2px oklch(0% 0 0 / 0.40);
+  --shadow-md: 0 4px 8px  oklch(0% 0 0 / 0.50);
+  --shadow-lg: 0 8px 24px oklch(0% 0 0 / 0.60);
+
+  /* Typography */
+  --font-sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
 }
 
+/* ============================================================
+   @theme — expose tokens as Tailwind utilities
+   ============================================================ */
 @theme inline {
-  --color-page: var(--bg-page);
-  --color-panel: var(--bg-panel);
-  --color-panel-hover: var(--bg-panel-hover);
-  
+  --color-page:          var(--bg-page);
+  --color-panel:         var(--bg-panel);
+  --color-panel-hover:   var(--bg-panel-hover);
+  --color-elevated:      var(--bg-elevated);
+
   --color-border-subtle: var(--border-subtle);
-  --color-border-hover: var(--border-hover);
-  
-  --color-fg-primary: var(--fg-primary);
-  --color-fg-secondary: var(--fg-secondary);
-  --color-fg-tertiary: var(--fg-tertiary);
+  --color-border-hover:  var(--border-hover);
+  --color-border-focus:  var(--border-focus);
+
+  --color-fg-primary:    var(--fg-primary);
+  --color-fg-secondary:  var(--fg-secondary);
+  --color-fg-tertiary:   var(--fg-tertiary);
+  --color-fg-disabled:   var(--fg-disabled);
+
+  --color-accent:        var(--accent);
+  --color-accent-muted:  var(--accent-muted);
+
+  --color-success:       var(--status-success);
+  --color-warning:       var(--status-warning);
+  --color-error:         var(--status-error);
+
+  /* Animation tokens — ease-out-quart per impeccable motion law */
+  --ease-out-quart: cubic-bezier(0.25, 1, 0.5, 1);
+
+  --animate-fade-in:      fade-in   0.18s var(--ease-out-quart);
+  --animate-slide-up:     slide-up  0.22s var(--ease-out-quart);
+  --animate-scale-in:     scale-in  0.20s var(--ease-out-quart);
+  --animate-scale-out:    scale-out 0.15s var(--ease-out-quart);
+  --animate-spin-slow:    spin      1.2s  linear infinite;
+
+  @keyframes fade-in {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+  }
+  @keyframes slide-up {
+    from { opacity: 0; transform: translateY(6px); }
+    to   { opacity: 1; transform: translateY(0);   }
+  }
+  @keyframes scale-in {
+    from { opacity: 0; transform: scale(0.96); }
+    to   { opacity: 1; transform: scale(1);    }
+  }
+  @keyframes scale-out {
+    from { opacity: 1; transform: scale(1);    }
+    to   { opacity: 0; transform: scale(0.96); }
+  }
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
 }
 
+/* ============================================================
+   BASE
+   ============================================================ */
 body {
   background-color: var(--bg-page);
   color: var(--fg-primary);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   letter-spacing: -0.01em;
   -webkit-font-smoothing: antialiased;
 }
 
-/* === UTILITIES === */
-
-.glass-panel {
-  background: var(--bg-panel);
+/* ============================================================
+   INPUTS — ui-ux-pro-max: all interactive elements need
+   clear focus states for keyboard navigation
+   ============================================================ */
+input, textarea, select {
+  background: var(--bg-page);
   border: 1px solid var(--border-subtle);
-  box-shadow: var(--shadow-sm);
+  color: var(--fg-primary);
+  border-radius: var(--radius-sm);
+  transition: border-color 0.15s ease, background-color 0.15s ease;
+  outline: none;
 }
 
-.glass-panel-hover:hover {
-  background: var(--bg-panel-hover);
-  border-color: var(--border-hover);
-  transform: translateY(-1px);
-  transition: all 0.2s ease;
+input:focus,
+textarea:focus,
+select:focus {
+  border-color: var(--border-focus);
+  background: var(--bg-panel);
+  box-shadow: 0 0 0 2px var(--accent-muted);
 }
 
-.mono-text {
+input::placeholder,
+textarea::placeholder {
+  color: var(--fg-disabled);
+}
+
+/* Checkbox refinement */
+input[type="checkbox"] {
+  accent-color: var(--accent);
+  cursor: pointer;
+}
+
+/* ============================================================
+   SCROLLBAR — minimal, non-intrusive
+   ============================================================ */
+::-webkit-scrollbar        { width: 5px; height: 5px; }
+::-webkit-scrollbar-track  { background: transparent; }
+::-webkit-scrollbar-thumb  { background: var(--border-hover); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--border-focus); }
+
+/* ============================================================
+   UTILITIES
+   ============================================================ */
+
+/* Section label — used throughout sidebar */
+.label-xs {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--fg-tertiary);
+}
+
+/* Monospace text */
+.mono {
   font-family: var(--font-mono);
   letter-spacing: -0.02em;
 }
 
-/* === INPUTS === */
-
-input, textarea {
-  background: #0A0A0A;
-  border: 1px solid var(--border-subtle);
-  color: var(--fg-primary);
-  border-radius: var(--radius-sm);
-  transition: border-color 0.15s ease;
+/* Status dot */
+.status-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
 }
 
-input:focus, textarea:focus {
+/* Focus ring utility — used on interactive elements without native focus */
+.focus-ring:focus-visible {
   outline: none;
-  border-color: var(--fg-tertiary);
-  background: #0D0D0D;
+  box-shadow: 0 0 0 2px var(--bg-panel), 0 0 0 4px var(--accent);
 }
 
-input::placeholder, textarea::placeholder {
-  color: var(--fg-tertiary);
+/* prefers-reduced-motion — ui-ux-pro-max requirement */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
 }
-
-/* === SCROLLBAR === */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #222; border-radius: 4px; }
-::-webkit-scrollbar-thumb:hover { background: #333; }
